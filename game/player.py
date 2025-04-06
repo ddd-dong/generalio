@@ -1,4 +1,4 @@
-from game_types import Tile, TileType
+from game.game_types import Tile, TileType
 from typing import List
 
 PLAYER_COLOR = {

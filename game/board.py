@@ -1,7 +1,11 @@
-from game_types import Tile,TileType
+from game.game_types import Tile,TileType
 import random
 from typing import List, Tuple, Dict, Optional, Set,Any
-from player import Player
+from game.player import Player
+import os
+import json
+import pickle
+import datetime
 
 
 GAME_DEFAULTS = {
@@ -24,7 +28,7 @@ def manhattan_distance(p1:Tile, p2:Tile) -> int:
 
 class GameBoard:
     def __init__(self,width: int, height: int, players:List[Player],cities_fairness:float=1.0,cities_circles_radius_ratio:float=0.5, 
-                 city_num:int=0, mountain_density:float=0.2, minimal_general_distance:int = 15,game_defaults:Dict[str, Any]=GAME_DEFAULTS):
+                 city_num:int=5, mountain_density:float=0.2, minimal_general_distance:int = 15,game_defaults:Dict[str, Any]=GAME_DEFAULTS):
         """
         Initialize the game board with the given parameters.
         :param width: Width of the board
@@ -116,7 +120,71 @@ class GameBoard:
                 if tries_count >= maximum_tries:
                     return False, f"Map initialization failed after maximum tries \n error: {error_msg}"
         raise Exception(f"Map initialization failed")
-    
+
+
+
+    def save_map(self, file_path: str,map_name:str="map.pkl"):
+        """
+        Save the map to a file.
+        :param file_path: Path to the file(ex. /map_files/)
+        """
+        data = {
+            "seting":{
+                "width": self.width,
+                "height": self.height,
+                "player_num": self.player_num,
+                "city_num": self.city_num,
+                "mountain_density": self.mountain_density,
+                "cities_initial_troops_range": self.cities_initial_troops_range,
+                "cities_fairness": self.cities_fairness,
+                "cities_circles_radius_ratio": self.cities_circles_radius_ratio,
+                "minimal_general_distance": self.minimal_general_distance,
+                "turn_per_round": self.turn_per_round,
+                "city_troops_increase": self.city_troops_increase
+            },
+            "save_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "map": self.map,
+            "players": self.players,
+            "generals": self.generals,
+            "cities": self.cities,
+            "mountains": self.mountains
+        }
+        root_path = os.path.dirname(os.path.abspath(__file__))+"/"
+        if not os.path.exists(root_path+file_path):
+            print(f"Creating directory {root_path+file_path}")
+            os.makedirs(root_path+file_path)
+        with open(root_path+file_path+map_name, "wb") as f:
+            pickle.dump(data, f)
+        print(root_path)
+        print(f"Map saved to {root_path+file_path+map_name}")
+
+    def load_map(self, file_path: str,map_name:str="map.pkl"):
+        """
+        Load the map from a file (don't have to initialize the map first).
+        """
+        root_path = os.path.dirname(os.path.abspath(__file__))+"/"
+        with open(root_path+file_path+map_name, "rb") as f:
+            data = pickle.load(f)
+        print(f"Map loaded from {file_path+map_name}, the seting will be overwritten")
+        self.width = data["seting"]["width"]
+        self.height = data["seting"]["height"]
+        self.player_num = data["seting"]["player_num"]
+        self.city_num = data["seting"]["city_num"]
+        self.mountain_density = data["seting"]["mountain_density"]
+        self.cities_initial_troops_range = data["seting"]["cities_initial_troops_range"]
+        self.cities_fairness = data["seting"]["cities_fairness"]
+        self.cities_circles_radius_ratio = data["seting"]["cities_circles_radius_ratio"]
+        self.minimal_general_distance = data["seting"]["minimal_general_distance"]
+        self.turn_per_round = data["seting"]["turn_per_round"]
+        self.city_troops_increase = data["seting"]["city_troops_increase"]
+        self.map = data["map"]
+        self.players = data["players"]
+        self.generals = data["generals"]
+        self.cities = data["cities"]
+        self.mountains = data["mountains"]
+        self.check_board_vaildity()
+        print(f"Map loaded successfully from {file_path+map_name}")
+
     
 
     def move(self, from_tile: Tile, to_tile: Tile, moved_troops:int) -> bool:
