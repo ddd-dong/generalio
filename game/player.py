@@ -12,7 +12,7 @@ PLAYER_COLOR = {
     "cyan": "#00FFFF",
     "brown": "#A52A2A"}
 
-class Player:
+class Player_Info:
     """
     need:
         - name: str
@@ -55,7 +55,7 @@ class Player:
             raise Exception(f"General tile should be transferred to citiy before adding:{tile}")
         if tile.state == TileType.MOUNTAIN:
             raise Exception(f"Mountain tile can't be added:{tile}")
-        self.lands += 1
+        self.lands_num += 1
         self.lands.append(tile)
     
     def update_numbers(self,map: List[List[Tile]]):

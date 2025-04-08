@@ -1,7 +1,7 @@
-from game.game_types import Tile,TileType
+from game.game_types import Tile,TileType,Direction
 import random
 from typing import List, Tuple, Dict, Optional, Set,Any
-from game.player import Player
+from game.player import Player_Info
 import os
 import json
 import pickle
@@ -10,7 +10,7 @@ import datetime
 
 GAME_DEFAULTS = {
     "CITIES_INITIAL_TROOPS_RANGE": (40, 51),
-    "CITY_TROOPS_INCREASE": 1, #each turn
+    "TROOPS_INCREASE": 1, #each turn
     "IS_RECORD_HISTORY": True,
     "HISTORY_RECORDING_INTERVAL": 1, #turn
     "HISTORY_RECORDING_MAX_SIZE": 50000, #turn
@@ -27,7 +27,7 @@ def manhattan_distance(p1:Tile, p2:Tile) -> int:
 
 
 class GameBoard:
-    def __init__(self,width: int, height: int, players:List[Player],cities_fairness:float=1.0,cities_circles_radius_ratio:float=0.5, 
+    def __init__(self,width: int, height: int, players:List[Player_Info],cities_fairness:float=1.0,cities_circles_radius_ratio:float=0.5, 
                  city_num:int=5, mountain_density:float=0.2, minimal_general_distance:int = 15,game_defaults:Dict[str, Any]=GAME_DEFAULTS):
         """
         Initialize the game board with the given parameters.
@@ -69,11 +69,11 @@ class GameBoard:
         self.map = [[Tile(x, y, TileType.EMPTY) for y in range(self.height)] for x in range(self.width)]
         self.players_defeated = []
 
-        self.move_queue = [[] for i in range(self.player_num)] # each player has a queue of moves to be executed in order
+        # self.move_queue = [[] for i in range(self.player_num)] # each player has a queue of moves to be executed in order
         self.turn = 0
         self.round = 0
         self.turn_per_round = game_defaults["TURN_PER_ROUND"]
-        self.city_troops_increase = game_defaults["CITY_TROOPS_INCREASE"]
+        self.troops_increase = game_defaults["TROOPS_INCREASE"]
 
         self.is_record_history = game_defaults["IS_RECORD_HISTORY"]
         self.history_recording_interval = game_defaults["HISTORY_RECORDING_INTERVAL"]
@@ -121,7 +121,94 @@ class GameBoard:
                     return False, f"Map initialization failed after maximum tries \n error: {error_msg}"
         raise Exception(f"Map initialization failed")
 
+    def next_round(self):
+        """
+        increase troops on all players' lands
+        """
+        self.round += 1
+        for x in range(self.width):
+            for y in range(self.height):
+                tile = self.map[x][y]
+                if tile.owner_id is not None:
+                    tile.troops += self.troops_increase
 
+    def next_turn(self,player_move:List[Tuple[Player_Info,Tile,Direction,int]])->List[bool]:
+        """
+        0. next round(every turn_per_round turns)
+        1. increase city troops
+        2. move all players' troops in order
+        3. check if the game is over
+        4. update players' numbers
+
+        return a list of bools indicating if the move is successful for each player
+        """
+        if len(player_move) != self.player_num:
+            raise Exception(f"player_move length {len(player_move)} != player_num {self.player_num}\n{player_move}")
+        self.turn += 1
+        if self.turn % self.turn_per_round == 0:
+            self.next_round()
+
+        for city in self.cities:
+            if city.owner_id is not None:
+                city.troops += self.troops_increase
+        for general in self.generals:
+            general.troops += self.troops_increase
+        
+        is_move_success = [True for i in range(self.player_num)]
+        for i in range(self.player_num):
+            if self.players[i].playing == False:
+                continue
+            if len(player_move[i]) == 0:
+                continue
+            now_move = self._recive_move(*player_move[i])
+            if not(now_move):
+                is_move_success[i] = False
+                continue
+            is_move_success[i] = self.move(*now_move)
+
+        
+        self.check_end_game()
+        for player in self.players:
+            player.update_numbers(self.map)
+        
+        return is_move_success
+
+    def _recive_move(self, player_info:Player_Info, from_tile:Tile, direction:Direction, moved_troops:int)->Tuple[Tile, Tile, int]:
+        """
+        Recive a move from player, check if the move is valid and return the move.
+        :param player_info: Player_Info object
+        :param from_tile: Tile object
+        :param direction: Direction object
+        :param moved_troops: Number of troops to be moved
+        """
+        if player_info.playing == False:
+            print(f"Player {player_info.name} is not playing")
+            return False
+        if from_tile.owner_id != player_info.id:
+            print(f"Player {player_info.name} does not own tile {from_tile}")
+            return False
+        if from_tile.x + direction.value[0] < 0 or from_tile.x + direction.value[0] >= self.width or\
+            from_tile.y + direction.value[1] < 0 or from_tile.y + direction.value[1] >= self.height:
+            raise Exception(f"Tile {from_tile} is out of bounds(with direction{direction.value})")
+        return (from_tile, self.map[from_tile.x + direction.value[0]][from_tile.y + direction.value[1]], moved_troops)
+
+    # def add_move(self, from_tile:Tile, direction:Direction, moved_troops:int, player_info:Player_Info):
+    #     """
+    #     Warning: this function won't check the mover's authority, check if player can do this move first
+    #     Add a move to the move queue.
+    #     :param tile: Tile object
+    #     :param direction: Direction object
+    #     :param moved_troops: Number of troops to be moved
+    #     """
+    #     # if from_tile.owner_id is None:
+    #     #     raise Exception(f"Tile {from_tile} is not owned by any player")
+    #     # boarder check
+    #     if from_tile.x + direction.value[0] < 0 or from_tile.x + direction.value[0] >= self.width:
+    #         raise Exception(f"Tile {from_tile} is out of bounds( with direction{direction.value} )")
+    #     if from_tile.y + direction.value[1] < 0 or from_tile.y + direction.value[1] >= self.height:
+    #         raise Exception(f"Tile {from_tile} is out of bounds( with direction{direction.value} )")
+    #     to_tile = self.map[from_tile.x + direction.value[0]][from_tile.y + direction.value[1]]
+    #     self.move_queue[player_info.id].append((from_tile, to_tile, moved_troops))
 
     def save_map(self, file_path: str,map_name:str="map.pkl"):
         """
@@ -140,7 +227,7 @@ class GameBoard:
                 "cities_circles_radius_ratio": self.cities_circles_radius_ratio,
                 "minimal_general_distance": self.minimal_general_distance,
                 "turn_per_round": self.turn_per_round,
-                "city_troops_increase": self.city_troops_increase
+                "troops_increase": self.troops_increase
             },
             "save_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "map": self.map,
@@ -176,7 +263,7 @@ class GameBoard:
         self.cities_circles_radius_ratio = data["seting"]["cities_circles_radius_ratio"]
         self.minimal_general_distance = data["seting"]["minimal_general_distance"]
         self.turn_per_round = data["seting"]["turn_per_round"]
-        self.city_troops_increase = data["seting"]["city_troops_increase"]
+        self.troops_increase = data["seting"]["troops_increase"]
         self.map = data["map"]
         self.players = data["players"]
         self.generals = data["generals"]
@@ -192,7 +279,9 @@ class GameBoard:
         Move a troop from one tile to another.
         return True if the move is successful(mean the following pre-move need be procceded), False otherwise.
         """
-
+        print(f"(From move())Moving {moved_troops} troops from {from_tile} to {to_tile}")
+        if from_tile.owner_id == None:
+            return False
         if manhattan_distance(from_tile, to_tile) > 1:
             return False
         if from_tile.troops <= 1:
@@ -213,8 +302,8 @@ class GameBoard:
         if from_tile.owner_id != to_tile.owner_id:
             return self.combat(from_tile, to_tile, moved_troops)
         if from_tile.owner_id == to_tile.owner_id:
-            to_tile.troops += (from_tile.troops - 1)
-            from_tile.troops = 1
+            to_tile.troops += moved_troops
+            from_tile.troops -= moved_troops
             return True
         else:
             raise Exception(f"Invalid move: I don't why this happened\nfrom_tile: {from_tile}, to_tile: {to_tile}")
@@ -241,7 +330,7 @@ class GameBoard:
             return True
         return False
 
-    def defeat_player(self, losser: Player, conqueror: Player):
+    def defeat_player(self, losser: Player_Info, conqueror: Player_Info):
         """
         Defeat a player, transfer their general to city, give all their lands to the conqueror
         """
@@ -284,6 +373,20 @@ class GameBoard:
             for x in range(self.width):
                 tile = self.map[x][y]
                 output += tile.state.value
+                output += " "
+            output += "\n"
+        return output
+    
+    def print_map(self,display_owner:bool=True)->str:
+        output = f"GameBoard({self.width} X {self.height}, player: {self.player_num})\n"
+        for y in range(self.height):
+            for x in range(self.width):
+                tile = self.map[x][y]
+                if display_owner:
+                    show_id = tile.owner_id if tile.owner_id is not None else 99
+                    output += f"({tile.state.value},{tile.troops:02d},{show_id:02d})"
+                else:
+                    output += f"({tile.state.value},{tile.troops:02d})"
                 output += " "
             output += "\n"
         return output
@@ -533,7 +636,7 @@ if __name__ == "__main__":
     players = []
     player_num = 3
     for i in range(player_num):
-        players.append(Player(f"Player {i}", i))
+        players.append(Player_Info(f"Player {i}", i))
     test = GameBoard(15, 15,  players,city_num=8)
     # print(test[0,1])
     # test[0,1] = Tile(0,1,TileType.CITY)

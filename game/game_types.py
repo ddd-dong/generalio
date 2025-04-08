@@ -6,7 +6,15 @@ class TileType(enum.Enum):
     MOUNTAIN = "#"
     CITY = "C"
     GENERAL = "G"
+    UNKNOWN_OBSTACLE = "X" #mountain or city
+    UNKNOWN_EMPTY = "?"  
 
+class Direction(enum.Enum):
+    UP = (0, -1)
+    DOWN = (0, 1)
+    LEFT = (-1, 0)
+    RIGHT = (1, 0)
+    
 
 class Tile:
     def __init__(self, x: int, y: int, state: TileType, owner_id: Optional[int] = None, troops: Optional[int] = 0):
