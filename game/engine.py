@@ -88,3 +88,12 @@ class GameEngine:
                     view[x][y] = Tile(x,y,TileType.UNKNOWN_EMPTY)
         return view
     
+    def get_leader_board(self)->List[Dict]:
+        """
+        get the leader board of the game
+        :return: list of players and their troops and lands number
+        """
+        leader_board = []
+        for player in self.players:
+            leader_board.append({"name":player.name,"troops":player.troops,"lands":player.lands_num})
+        return leader_board
