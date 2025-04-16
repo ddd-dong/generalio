@@ -62,7 +62,14 @@
         <p>Create your user to start playing!</p>
         <form id="createUserForm">
             <input type="text" id="username" name="username" placeholder="Enter your username" required>
-            <button type="submit">Create User</button>
+            <button type="submit">Create New Game</button>
+        </form>
+        <hr style="margin: 30px 0; border: 1px solid #444;">
+        <p>Or join an existing game:</p>
+        <form id="joinGameForm">
+            <input type="text" id="joinUsername" name="joinUsername" placeholder="Enter your username" required>
+            <input type="text" id="joinGameId" name="joinGameId" placeholder="Enter Game ID" required>
+            <button type="submit">Join Game</button>
         </form>
         <div class="footer">
             © 2025 Generals.io. All rights reserved.
@@ -79,7 +86,8 @@
                 return;
             }
 
-            const response = await fetch('/api/create_user', {
+            // Step 1: Create user
+            const userResponse = await fetch('/api/create_user', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -87,13 +95,73 @@
                 body: JSON.stringify({ name: username })
             });
 
-            const result = await response.json();
-            if (response.ok) {
-                alert('User created successfully! Your unique ID: ' + result.unique_id);
-                // Redirect or perform other actions here
-            } else {
-                alert('Error: ' + result.error);
+            const userResult = await userResponse.json();
+            if (!userResponse.ok) {
+                alert('Error: ' + userResult.error);
+                return;
             }
+
+            const uniqueId = userResult.unique_id;
+            localStorage.setItem('unique_id', uniqueId); // Store unique ID for later use
+
+            // Step 2: Create new game
+            const gameResponse = await fetch('/api/new_game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ host_unique_id: uniqueId })
+            });
+
+            const gameResult = await gameResponse.json();
+            if (!gameResponse.ok) {
+                alert('Error: ' + gameResult.error);
+                return;
+            }
+
+            const gameId = gameResult.game_id;
+
+            // Step 3: Redirect to waiting room
+            window.location.href = `/waiting/${gameId}`;
+        });
+        document.getElementById('joinGameForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const username = document.getElementById('joinUsername').value;
+            const gameId = document.getElementById('joinGameId').value;
+    
+            if (!username || !gameId) {
+                alert('Please enter both username and game ID.');
+                return;
+            }
+    
+            // Step 1: Create user
+            const userResponse = await fetch('/api/create_user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: username })
+            });
+            const userResult = await userResponse.json();
+            if (!userResponse.ok) {
+                alert('Error: ' + userResult.error);
+                return;
+            }
+            const uniqueId = userResult.unique_id;
+            localStorage.setItem('unique_id', uniqueId);
+    
+            // Step 2: Join game
+            const joinResponse = await fetch('/api/join_game', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ game_id: gameId, unique_id: uniqueId })
+            });
+            const joinResult = await joinResponse.json();
+            if (!joinResponse.ok) {
+                alert('Error: ' + joinResult.error);
+                return;
+            }
+    
+            // Step 3: Redirect to waiting room
+            window.location.href = `/waiting/${gameId}`;
         });
     </script>
 </body>

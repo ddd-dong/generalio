@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        #game-board {
+            display: grid;
+            margin: 20px auto;
+            gap: 2px;
+        }
+        .tile {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+        .selected {
+            outline: 3px solid #2196F3;
+            z-index: 2;
+        }
+        .empty { background-color: #e0e0e0; }
+        .mountain { background-color: #8b4513; color: #fff;}
+        .city { background-color: #ffd700; }
+        .general { background-color: #ff4500; color: #fff;}
+        .unknown-obstacle { background-color: #666; }
+        .unknown-empty { background-color: #bdbdbd; }
+    </style>
+</head>
+<body>
+    <h1>Game in Progress</h1>
+    <div id="game-board"></div>
+    <script>
+        const gameId = "{{ game_id }}";
+        const uniqueId = localStorage.getItem("unique_id");
+        let gameMap = [];
+        let selected = null; // {x, y}
+
+        async function fetchPlayerView() {
+            const response = await fetch('/api/get_player_view', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ unique_id: uniqueId })
+            });
+            if (response.ok) {
+                gameMap = await response.json();
+                renderGameBoard();
+            }
+        }
+
+        function renderGameBoard() {
+            const board = document.getElementById('game-board');
+            board.innerHTML = '';
+            if (!gameMap || !gameMap.length) return;
+            // 注意：這裡 gameMap[x][y]，所以長度反過來
+            board.style.gridTemplateColumns = `repeat(${gameMap.length}, 40px)`;
+        
+            for (let y = 0; y < gameMap[0].length; y++) {
+                for (let x = 0; x < gameMap.length; x++) {
+                    const tile = gameMap[x][y];
+                    const tileDiv = document.createElement('div');
+                    tileDiv.className = 'tile';
+        
+                    switch (tile.state) {
+                        case ".": tileDiv.classList.add('empty'); break;
+                        case "#": tileDiv.classList.add('mountain'); break;
+                        case "C": tileDiv.classList.add('city'); break;
+                        case "G": tileDiv.classList.add('general'); break;
+                        case "X": tileDiv.classList.add('unknown-obstacle'); break;
+                        case "?": tileDiv.classList.add('unknown-empty'); break;
+                        default: tileDiv.style.backgroundColor = '#fff';
+                    }
+        
+                    if (tile.owner_id && tile.owner_color && tile.state !== "X" && tile.state !== "?") {
+                        tileDiv.style.backgroundColor = tile.owner_color;
+                        if (tile.state === "G") tileDiv.style.border = "2px solid #000";
+                        if (tile.state === "C") tileDiv.style.border = "2px solid #FFD700";
+                    }
+        
+                    if (tile.troops > 0 && tile.state !== "X" && tile.state !== "?") {
+                        tileDiv.textContent = tile.troops;
+                    }
+        
+                    // 選擇格子高亮
+                    if (selected && selected.x === x && selected.y === y) {
+                        tileDiv.classList.add('selected');
+                    }
+        
+                    // 只能選擇自己可見且自己擁有的格子
+                    tileDiv.addEventListener('click', () => {
+                        if (
+                            tile.owner_id === uniqueId &&
+                            tile.state !== "X" && tile.state !== "?" &&
+                            tile.troops > 1
+                        ) {
+                            selected = { x, y };
+                            renderGameBoard();
+                        }
+                    });
+        
+                    board.appendChild(tileDiv);
+                }
+            }
+        }
+
+        // 鍵盤方向對應
+        const dirMap = {
+            'w': { dx: 0, dy: -1, dir: 'UP' },
+            'a': { dx: -1, dy: 0, dir: 'LEFT' },
+            's': { dx: 0, dy: 1, dir: 'DOWN' },
+            'd': { dx: 1, dy: 0, dir: 'RIGHT' }
+        };
+
+        document.addEventListener('keydown', async (e) => {
+            if (!selected) return;
+            const key = e.key.toLowerCase();
+            if (!(key in dirMap)) return;
+
+            const { dx, dy, dir } = dirMap[key];
+            const from_x = selected.x;
+            const from_y = selected.y;
+            const to_x = from_x + dx;
+            const to_y = from_y + dy;
+
+            // 檢查目標格是否在地圖內
+            if (
+                to_x < 0 || to_x >= gameMap.length ||
+                to_y < 0 || to_y >= gameMap[0].length
+            ) return;
+
+            // 呼叫API添加pre move
+            await fetch('/api/move', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    unique_id: uniqueId,
+                    from_x: from_x,
+                    from_y: from_y,
+                    direction: dir
+                    // troop_num 不填，預設移動所有可移動兵力
+                })
+            });
+
+            // 更新選擇格子到新位置
+            selected = { x: to_x, y: to_y };
+            // 立即刷新地圖
+            fetchPlayerView();
+        });
+
+        setInterval(fetchPlayerView, 1000);
+        fetchPlayerView();
+    </script>
+</body>
+</html>

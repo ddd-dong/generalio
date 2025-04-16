@@ -51,7 +51,14 @@ class GameEngine:
         for i in range(self.game_board.player_num):
             if is_move_success[i] == False:
                 self.pre_moves_queue[i].clear()
-        
+    
+    def is_game_end(self)->bool:
+        """
+        check if the game is end
+        :return: True if the game is end, False otherwise
+        """
+        return self.game_board.check_end_game()
+
     def get_mask(self,player_info:Player_Info)->List[List[bool]]:
         """
         get the mask of the map for the player

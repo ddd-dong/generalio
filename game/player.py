@@ -22,8 +22,9 @@ class Player_Info:
         - total lands: int
         - total cities: int
         - color: str (optional)
+        - unique_id: str (optional)
     """
-    def __init__(self, name: str, player_id: int):
+    def __init__(self, name: str, player_id: int,unique_id:str = None):
         self.name = name
         self.id = player_id
         self.color = None
@@ -34,6 +35,7 @@ class Player_Info:
         self.lands_num = 0
         self.lands = []
         self.playing = True
+        self.unique_id = unique_id
     
     def __repr__(self):
         output= f"Player {self.id} ({self.name})\n"
