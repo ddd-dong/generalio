@@ -60,7 +60,14 @@ def new_game():
     if host_unique_id not in users:
         return jsonify({"error": "Host unique ID not found"}), 400
 
-    game_id = str(uuid.uuid4())
+    
+    for _ in range(10):
+        game_id = str(uuid.uuid4())[:6]
+        if game_id not in games:
+            break
+    if game_id in games:
+        return jsonify({"error": "Game ID generation failed"}), 400
+
     
     games[game_id] = None
     users[host_unique_id]['game_id'] = game_id
@@ -324,3 +331,115 @@ def is_game_started():
         return jsonify({"isstarted": False}), 200
     else:
         return jsonify({"isstarted": True}), 200
+
+
+@api_router.route('/api/get_game_state', methods=['POST'])
+def get_game_state():
+    """
+    Get the game state for the given configuration.
+    config format:
+    {
+        "game_id": str,
+        "unique_id": str
+    }
+    returns: 
+    {
+        "isruning": bool,
+        "is_calling_player_still_playing": bool,
+        "game_state": {
+            "players": [
+                {
+                    "name": str,
+                    "color": str,
+                    "isplaying": bool,
+                    "troops": int,
+                    "lands_num": int
+                }
+    """
+    config = request.get_json()
+    if not config:
+        return jsonify({"error": "Invalid configuration"}), 400
+    if not check_config(config, ['game_id', 'unique_id']):
+        return jsonify({"error": "Missing configuration key"}), 400
+    if config['game_id'] not in games:
+        return jsonify({"error": "Game ID not found"}), 400
+    if config['unique_id'] not in users:
+        return jsonify({"error": "Unique ID not found"}), 400
+    game_id = config['game_id']
+    unique_id = config['unique_id']
+    if users[unique_id]['game_id'] != game_id:
+        return jsonify({"error": "User not in the game"}), 400
+    if games[game_id] is None:
+        return jsonify({"error": "Game not started"}), 400
+    game_engine = games[game_id]
+    calling_player = users[unique_id]['player_info']
+    leader_board = game_engine.get_leader_board()
+    is_game_end = game_engine.is_game_end()
+    game_state = {
+        "isruning": not is_game_end,
+        "is_calling_player_still_playing": calling_player.playing,
+        "leader_board": leader_board
+    }
+    return jsonify(game_state), 200
+
+@api_router.route('/api/full_map', methods=['POST'])
+def get_full_map():
+    """
+    Get the full map for the given configuration.
+    config format:
+    {
+        "game_id": str,
+        "unique_id": str
+    }
+    returns: 
+    {
+        "x": tile.x,
+        "y": tile.y,
+        "state": tile.state.value,
+        "owner_id": player's unique id,
+        "owner_color": player's color,
+        "troops": tile.troops
+    }
+    """
+    config = request.get_json()
+    if not config:
+        return jsonify({"error": "Invalid configuration"}), 400
+    if not check_config(config, ['game_id', 'unique_id']):
+        return jsonify({"error": "Missing configuration key"}), 400
+    if config['game_id'] not in games:
+        return jsonify({"error": "Game ID not found"}), 400
+    if config['unique_id'] not in users:
+        return jsonify({"error": "Unique ID not found"}), 400
+    game_id = config['game_id']
+    unique_id = config['unique_id']
+    if users[unique_id]['game_id'] != game_id:
+        return jsonify({"error": "User not in the game"}), 400
+    if games[game_id] is None:
+        return jsonify({"error": "Game not started"}), 400
+    if users[unique_id]['player_info'] is None:
+        return jsonify({"error": "Player not in game"}), 400
+    if users[unique_id]['player_info'].playing == True:
+        return jsonify({"error": "Player is still playing"}), 400
+    game_engine = games[game_id]
+    game_board = game_engine.get_full_map()
+    game_map_json = []
+    for row in game_board:
+        row_json = []
+        for tile in row:
+            if tile.owner_id is None:
+                tile_owner_unique_id = None
+                tile_owner_color = None
+            else:
+                tile_owner_unique_id = game_board.players[tile.owner_id].unique_id 
+                tile_owner_color = game_board.players[tile.owner_id].color
+            tile_json = {
+                "x": tile.x,
+                "y": tile.y,
+                "state": tile.state.value,
+                "owner_id": tile_owner_unique_id,
+                "owner_color": tile_owner_color,
+                "troops": tile.troops
+            }
+            row_json.append(tile_json)
+        game_map_json.append(row_json)
+    return jsonify(game_map_json), 200

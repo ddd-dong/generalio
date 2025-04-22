@@ -10,7 +10,7 @@ import datetime
 
 GAME_DEFAULTS = {
     "CITIES_INITIAL_TROOPS_RANGE": (40, 51),
-    "TROOPS_INCREASE": 1, #each turn
+    "TROOPS_INCREASE": 10, #each turn
     "IS_RECORD_HISTORY": True,
     "HISTORY_RECORDING_INTERVAL": 1, #turn
     "HISTORY_RECORDING_MAX_SIZE": 50000, #turn
@@ -28,7 +28,7 @@ def manhattan_distance(p1:Tile, p2:Tile) -> int:
 
 class GameBoard:
     def __init__(self,width: int, height: int, players:List[Player_Info],cities_fairness:float=1.0,cities_circles_radius_ratio:float=0.5, 
-                 city_num:int=5, mountain_density:float=0.2, minimal_general_distance:int = 15,game_defaults:Dict[str, Any]=GAME_DEFAULTS):
+                 city_num:int=5, mountain_density:float=0.2, minimal_general_distance:int = 5,game_defaults:Dict[str, Any]=GAME_DEFAULTS):
         """
         Initialize the game board with the given parameters.
         :param width: Width of the board
@@ -316,11 +316,12 @@ class GameBoard:
             attacker.troops -= attacker_troops
             return False
         if defender.troops < attacker_troops:
-            defender.owner_id = attacker.owner_id
             defender.troops =  attacker_troops - defender.troops
             attacker.troops -= attacker_troops
             if defender.state == TileType.GENERAL:
-                self.defeat_player(self.players[defender.owner_id])
+                print(f"Player {self.players[attacker.owner_id].name} defeated player {self.players[defender.owner_id].name}")
+                self.defeat_player(self.players[defender.owner_id], self.players[attacker.owner_id])
+            defender.owner_id = attacker.owner_id
             self.players[attacker.owner_id].add_tile(defender)
             return True
 
@@ -345,8 +346,13 @@ class GameBoard:
             for y in range(self.height):
                 tile = self.map[x][y]
                 if tile.owner_id == losser.id:
+                    if tile.state == TileType.GENERAL:
+                        # print(f"Player {losser.name} defeated, but their general is not in a city")
+                        # print(tile)
+                        tile.state = TileType.CITY
                     tile.owner_id = conqueror.id
                     conqueror.add_tile(tile)
+        # print(self)
         conqueror.update_numbers(self.map)
 
 

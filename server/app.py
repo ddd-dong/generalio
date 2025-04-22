@@ -29,7 +29,7 @@ def runing_game():
                     engine.process_turn()
                     if engine.is_game_end():
                         print(f"Game {game_id} has ended.")
-                        del games[game_id]
+                        # del games[game_id]
                 except Exception as e:
                     print(f"Error processing turn for game {game_id}: {e}")
         time.sleep(1)

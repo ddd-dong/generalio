@@ -95,6 +95,13 @@ class GameEngine:
                     view[x][y] = Tile(x,y,TileType.UNKNOWN_EMPTY)
         return view
     
+    def get_full_map(self)->List[List[Tile]]:
+        """
+        get the full map of the game
+        :return: full map of the game
+        """
+        return self.game_board.map
+
     def get_leader_board(self)->List[Dict]:
         """
         get the leader board of the game
@@ -102,5 +109,5 @@ class GameEngine:
         """
         leader_board = []
         for player in self.players:
-            leader_board.append({"name":player.name,"troops":player.troops,"lands":player.lands_num})
+            leader_board.append({"name":player.name,"troops":player.troops,"lands_num":player.lands_num,"isplaying":player.playing,"color":player.color})
         return leader_board
