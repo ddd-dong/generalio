@@ -1,5 +1,5 @@
 # Generalio
-![playing_img](readme_img\playing_img.png)
+![playing_img](readme_img/playing_img.png)
 
 A small python project for personal use.
 
@@ -97,7 +97,7 @@ Capture all enemy generals to win the game.
 ```
 
 ## API
-![image](readme_img\generousio_server.drawio.png)
+![image](readme_img/generousio_server.drawio.png)
 ### POST `/api/create_user`
 Create a new user.
 **Request:**  
